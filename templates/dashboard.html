@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IEEE 2030.5 Server Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1f2937;
+    --border: #30363d;
+    --accent: #00d4aa;
+    --accent2: #3b82f6;
+    --accent3: #f59e0b;
+    --warn: #ef4444;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #3fb950;
+    --radius: 8px;
+    --mono: "SF Mono", "Fira Code", "Consolas", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+  }
+  .sidebar-section h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    padding-left: 8px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Limits Form */
+  .limits-form { display: flex; flex-direction: column; gap: 10px; }
+  .limit-row label {
+    font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px;
+  }
+  .limit-row input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--mono);
+    transition: border-color 0.15s;
+  }
+  .limit-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s;
+    margin-top: 4px;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn.secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .save-msg {
+    font-size: 11px;
+    color: var(--green);
+    text-align: center;
+    height: 16px;
+    transition: opacity 0.3s;
+  }
+
+  /* ── Content ── */
+  .content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+  .tab {
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    position: relative;
+    top: 1px;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border);
+    border-bottom-color: var(--surface);
+  }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 20px; }
+
+  /* Chart Card */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .chart-card h4 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* Grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .table-card h4 {
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; padding: 8px 12px;
+    font-size: 11px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  td {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+    font-family: var(--mono);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: sans-serif;
+  }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--accent3); }
+
+  /* Log panel */
+  .log-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 12px;
+    height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .log-line { padding: 2px 0; color: var(--muted); }
+  .log-line .ts { color: var(--accent2); margin-right: 8px; }
+  .log-line .msg { color: #adbac7; }
+
+  /* Message composer */
+  .msg-row { display: flex; gap: 8px; }
+  .msg-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .msg-row input:focus { outline: none; border-color: var(--accent); }
+  .msg-row .btn { width: auto; padding: 8px 16px; }
+
+  /* Endpoint list */
+  .endpoint-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+  }
+  .endpoint-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ep-method {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: 44px;
+    text-align: center;
+  }
+  .ep-get { background: rgba(63,185,80,0.15); color: var(--green); }
+  .ep-post { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .ep-put { background: rgba(245,158,11,0.15); color: var(--accent3); }
+  .ep-del { background: rgba(239,68,68,0.15); color: var(--warn); }
+  .ep-path { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .ep-desc { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* UOM labels */
+  .uom-38 { color: #a78bfa; }
+  .uom-29 { color: #60a5fa; }
+  .uom-63 { color: #34d399; }
+  .uom-5  { color: #f97316; }
+  .uom-33 { color: #fbbf24; }
+
+  /* Registration flow */
+  .flow-step {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .step-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .step-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .step-desc code { font-family: var(--mono); color: var(--accent); font-size: 10px; }
+
+  .pin-display {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--accent3);
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 5px;
+    padding: 2px 8px;
+  }
+  .action-btns { display: flex; gap: 5px; }
+  .action-btn {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .action-btn:hover { opacity: 0.75; }
+  .btn-approve { background: rgba(63,185,80,0.2); color: var(--green); }
+  .btn-reject  { background: rgba(239,68,68,0.15); color: var(--warn); }
+  .btn-regen   { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .badge-pending  { background: rgba(245,158,11,0.15); color: var(--accent3); }
+  .badge-confirmed { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-rejected { background: rgba(239,68,68,0.15); color: var(--warn); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    IEEE 2030.5 Test Server
+  </div>
+  <div class="header-right">
+    <span><span class="status-dot"></span>Running on port 8080</span>
+    <span id="serverTime">—</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>Overview</h3>
+      <div class="stat-card">
+        <div class="stat-label">End Devices</div>
+        <div class="stat-value" id="devCount">0</div>
+        <div class="stat-sub">registered</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Mirror Usage Points</div>
+        <div class="stat-value" id="mupCount">0</div>
+        <div class="stat-sub">active</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Telemetry Points</div>
+        <div class="stat-value" id="telCount">0</div>
+        <div class="stat-sub">total received</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Last Reading</div>
+        <div class="stat-value" id="lastVal" style="font-size:16px">—</div>
+        <div class="stat-sub" id="lastTs">—</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>DER Limits</h3>
+      <div class="limits-form">
+        <div class="limit-row">
+          <label>Max Active Power (W × 10⁻³)</label>
+          <input type="number" id="lim-maxW" placeholder="10000">
+        </div>
+        <div class="limit-row">
+          <label>Max Reactive Power (VAR × 10⁻³)</label>
+          <input type="number" id="lim-maxVar" placeholder="5000">
+        </div>
+        <div class="limit-row">
+          <label>Max Apparent Power (VA × 10⁻³)</label>
+          <input type="number" id="lim-maxVA" placeholder="11000">
+        </div>
+        <div class="limit-row">
+          <label>High Freq Limit (Hz × 100)</label>
+          <input type="number" id="lim-highFreq" placeholder="6020">
+        </div>
+        <div class="limit-row">
+          <label>Low Freq Limit (Hz × 100)</label>
+          <input type="number" id="lim-lowFreq" placeholder="5970">
+        </div>
+        <div class="limit-row">
+          <label>High Voltage Limit (V × 100)</label>
+          <input type="number" id="lim-highVolt" placeholder="12000">
+        </div>
+        <div class="limit-row">
+          <label>Low Voltage Limit (V × 100)</label>
+          <input type="number" id="lim-lowVolt" placeholder="10800">
+        </div>
+        <button class="btn" onclick="saveLimits()">Apply Limits</button>
+        <div class="save-msg" id="saveMsg"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Send Message</h3>
+      <div class="msg-row" style="flex-direction:column; gap:8px;">
+        <input type="text" id="msgInput" placeholder="Message to client...">
+        <button class="btn secondary" onclick="sendMsg()">Queue Message</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Content ── -->
+  <div class="content">
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('telemetry', this)">📊 Telemetry</div>
+      <div class="tab" onclick="showTab('registration', this)">🔐 Registration</div>
+      <div class="tab" onclick="showTab('devices', this)">🔌 Devices</div>
+      <div class="tab" onclick="showTab('endpoints', this)">🗺 Endpoints</div>
+      <div class="tab" onclick="showTab('logs', this)">📋 Logs</div>
+    </div>
+
+    <!-- Telemetry Tab -->
+    <div class="tab-panel active" id="tab-telemetry">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h4>Active Power (W)</h4>
+          <div class="chart-wrap"><canvas id="chartW"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h4>Reactive Power (VAR)</h4>
+          <div class="chart-wrap"><canvas id="chartVar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h4>Voltage (V)</h4>
+          <div class="chart-wrap"><canvas id="chartV"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h4>Current (A)</h4>
+          <div class="chart-wrap"><canvas id="chartA"></canvas></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <h4>Recent Readings</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>MUP</th>
+              <th>Description</th>
+              <th>Value</th>
+              <th>UOM</th>
+            </tr>
+          </thead>
+          <tbody id="telemetryTable">
+            <tr><td colspan="5" class="empty-state">No readings yet — waiting for client</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Registration Tab -->
+    <div class="tab-panel" id="tab-registration">
+      <div class="table-card">
+        <h4>Device Registration</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Device ID</th>
+              <th>lFDI</th>
+              <th>PIN</th>
+              <th>Status</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="regTable">
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No devices registered yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="chart-card">
+        <h4>Registration Flow</h4>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:4px;">
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div class="step-title">Client POSTs to /edev</div>
+            <div class="step-desc">Server creates EndDevice with <code>enabled=false</code> and generates a random 6-digit PIN</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">2</div>
+            <div class="step-title">Client GETs /edev/&lt;id&gt;/reg</div>
+            <div class="step-desc">Client receives the Registration resource containing the PIN and <code>dateTimeRegistered</code></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">3</div>
+            <div class="step-title">Client PUTs PIN back</div>
+            <div class="step-desc">Client PUTs <code>&lt;Registration&gt;&lt;pIN&gt;XXXXXX&lt;/pIN&gt;&lt;/Registration&gt;</code> — server validates PIN, sets <code>enabled=true</code></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">4</div>
+            <div class="step-title">Dashboard override</div>
+            <div class="step-desc">Approve, reject, or regenerate PIN directly from the table above without client interaction</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Devices Tab -->
+    <div class="tab-panel" id="tab-devices">
+      <div class="table-card">
+        <h4>End Devices</h4>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>lFDI</th><th>sFDI</th><th>Status</th><th>Changed</th></tr>
+          </thead>
+          <tbody id="devTable">
+            <tr><td colspan="5" class="empty-state">No end devices registered yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-card">
+        <h4>Mirror Usage Points</h4>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>mRID</th><th>Device lFDI</th><th>Readings</th></tr>
+          </thead>
+          <tbody id="mupTable">
+            <tr><td colspan="4" class="empty-state">No mirror usage points yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Endpoints Tab -->
+    <div class="tab-panel" id="tab-endpoints">
+      <div class="chart-card">
+        <h4>All IEEE 2030.5 Endpoints</h4>
+        <div class="endpoint-list" id="endpointList"></div>
+      </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div class="tab-panel" id="tab-logs">
+      <div class="chart-card">
+        <h4>Server Log</h4>
+        <div class="log-panel" id="logPanel"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Chart setup ──
+const CHART_OPTS = (label, color) => ({
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label,
+      data: [],
+      borderColor: color,
+      backgroundColor: color + '22',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      fill: true,
+      tension: 0.3,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#7d8590', font: { size: 10 } }, grid: { color: '#1f2937' } },
+      y: { ticks: { color: '#7d8590', font: { size: 10 } }, grid: { color: '#1f2937' } },
+    }
+  }
+});
+
+const charts = {
+  38: new Chart(document.getElementById('chartW'), CHART_OPTS('Watts', '#00d4aa')),
+  29: new Chart(document.getElementById('chartVar'), CHART_OPTS('VAR', '#3b82f6')),
+  63: new Chart(document.getElementById('chartV'), CHART_OPTS('Volts', '#a78bfa')),
+  5:  new Chart(document.getElementById('chartA'), CHART_OPTS('Amps', '#f59e0b')),
+};
+
+const MAX_CHART_POINTS = 60;
+
+// UOM names
+const UOM = { '38': 'W', '29': 'VAR', '63': 'V', '5': 'A', '33': 'Hz', '72': 'Wh', '61': 'VA', '2': '°C' };
+
+function uomName(u) { return UOM[String(u)] || `UOM:${u}`; }
+
+function fmtTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString();
+}
+
+function fmtVal(val, mult) {
+  if (val == null) return '—';
+  const m = Math.pow(10, parseInt(mult || '0'));
+  const n = parseFloat(val) * m;
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(2) + 'k';
+  return n.toFixed(2);
+}
+
+// ── Tab switching ──
+function showTab(name, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Telemetry polling ──
+let knownCount = 0;
+
+async function poll() {
+  try {
+    const r = await fetch('/api/telemetry?limit=200');
+    const d = await r.json();
+
+    // Stats
+    document.getElementById('devCount').textContent = d.endDeviceCount;
+    document.getElementById('mupCount').textContent = d.mupCount;
+    document.getElementById('telCount').textContent = d.telemetry.length;
+    document.getElementById('serverTime').textContent = new Date(d.serverTime * 1000).toLocaleTimeString();
+
+    if (d.telemetry.length > 0) {
+      const last = d.telemetry[d.telemetry.length - 1];
+      document.getElementById('lastVal').textContent = `${fmtVal(last.value, last.multiplier)} ${uomName(last.uom)}`;
+      document.getElementById('lastTs').textContent = fmtTime(last.timestamp);
+    }
+
+    // Charts — group by UOM
+    const byUOM = {};
+    for (const t of d.telemetry) {
+      const k = String(t.uom);
+      if (!byUOM[k]) byUOM[k] = [];
+      byUOM[k].push(t);
+    }
+    for (const [uom, ch] of Object.entries(charts)) {
+      const pts = byUOM[uom] || [];
+      const slice = pts.slice(-MAX_CHART_POINTS);
+      ch.data.labels = slice.map(p => fmtTime(p.timestamp));
+      ch.data.datasets[0].data = slice.map(p => parseFloat(fmtVal(p.value, p.multiplier)));
+      ch.update();
+    }
+
+    // Telemetry table (latest 50)
+    const rows = d.telemetry.slice(-50).reverse();
+    const tbody = document.getElementById('telemetryTable');
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Waiting for client to post readings…</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${fmtTime(r.timestamp)}</td>
+          <td>${r.mupId || '—'}</td>
+          <td>${r.description || '—'}</td>
+          <td><strong>${fmtVal(r.value, r.multiplier)}</strong></td>
+          <td><span class="badge badge-blue">${uomName(r.uom)}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    // Load limits into form (once)
+    if (knownCount === 0 && d.limits) {
+      for (const [k, v] of Object.entries(d.limits)) {
+        const el = document.getElementById('lim-' + k);
+        if (el) el.value = v;
+      }
+    }
+    knownCount = d.telemetry.length;
+
+  } catch (e) { /* server may be starting */ }
+}
+
+// ── Registration actions ──
+async function approveDevice(eid) {
+  await fetch(`/api/devices/${eid}/approve`, { method: 'POST' });
+  pollDevices();
+}
+async function rejectDevice(eid) {
+  await fetch(`/api/devices/${eid}/reject`, { method: 'POST' });
+  pollDevices();
+}
+async function regenPin(eid) {
+  const r = await fetch(`/api/devices/${eid}/regenerate_pin`, { method: 'POST' });
+  const d = await r.json();
+  pollDevices();
+}
+
+// ── Devices polling ──
+async function pollDevices() {
+  try {
+    const r = await fetch('/api/devices');
+    const d = await r.json();
+
+    // Registration table
+    const regBody = document.getElementById('regTable');
+    if (d.endDevices.length === 0) {
+      regBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No devices registered yet</td></tr>';
+    } else {
+      regBody.innerHTML = d.endDevices.map(dev => {
+        const status = dev.registrationStatus || 'pending';
+        const badgeClass = { pending: 'badge-pending', confirmed: 'badge-confirmed', rejected: 'badge-rejected' }[status] || 'badge-pending';
+        return `<tr>
+          <td><code style="font-size:11px">${dev.id}</code></td>
+          <td style="color:var(--muted);font-size:11px">${(dev.lFDI||'—').substring(0,20)}</td>
+          <td><span class="pin-display">${dev.pin || '—'}</span></td>
+          <td><span class="badge ${badgeClass}">${status}</span></td>
+          <td style="font-size:11px">${dev.dateTimeRegistered ? fmtTime(dev.dateTimeRegistered) : '—'}</td>
+          <td>
+            <div class="action-btns">
+              ${status !== 'confirmed' ? `<button class="action-btn btn-approve" onclick="approveDevice('${dev.id}')">✓ Approve</button>` : ''}
+              ${status !== 'rejected'  ? `<button class="action-btn btn-reject"  onclick="rejectDevice('${dev.id}')">✗ Reject</button>`  : ''}
+              <button class="action-btn btn-regen" onclick="regenPin('${dev.id}')">↻ New PIN</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Devices table
+    const dBody = document.getElementById('devTable');
+    if (d.endDevices.length === 0) {
+      dBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No end devices registered yet</td></tr>';
+    } else {
+      dBody.innerHTML = d.endDevices.map(dev => `
+        <tr>
+          <td>${dev.id}</td>
+          <td style="color:var(--muted)">${dev.lFDI || '—'}</td>
+          <td style="color:var(--muted)">${dev.sFDI || '—'}</td>
+          <td><span class="badge ${dev.enabled ? 'badge-green' : 'badge-yellow'}">${dev.enabled ? 'Enabled' : 'Disabled'}</span></td>
+          <td>${fmtTime(dev.changedTime)}</td>
+        </tr>
+      `).join('');
+    }
+
+    const mBody = document.getElementById('mupTable');
+    if (d.mirrorUsagePoints.length === 0) {
+      mBody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No mirror usage points yet</td></tr>';
+    } else {
+      mBody.innerHTML = d.mirrorUsagePoints.map(m => `
+        <tr>
+          <td>${m.id}</td>
+          <td>${m.mRID}</td>
+          <td style="color:var(--muted)">${m.deviceLFDI || '—'}</td>
+          <td><span class="badge badge-yellow">—</span></td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {}
+}
+
+// ── Logs polling ──
+async function pollLogs() {
+  try {
+    const r = await fetch('/api/logs?limit=100');
+    const d = await r.json();
+    const panel = document.getElementById('logPanel');
+    panel.innerHTML = d.logs.slice().reverse().map(l => `
+      <div class="log-line">
+        <span class="ts">${fmtTime(l.timestamp)}</span>
+        <span class="msg">${l.message}</span>
+      </div>
+    `).join('');
+  } catch (e) {}
+}
+
+// ── Limits ──
+async function saveLimits() {
+  const keys = ['maxW','maxVar','maxVA','highFreq','lowFreq','highVolt','lowVolt'];
+  const body = {};
+  for (const k of keys) {
+    const el = document.getElementById('lim-' + k);
+    if (el && el.value !== '') body[k] = parseInt(el.value);
+  }
+  await fetch('/api/limits', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const msg = document.getElementById('saveMsg');
+  msg.textContent = '✓ Limits applied — client will see on next poll';
+  setTimeout(() => msg.textContent = '', 4000);
+}
+
+// ── Message ──
+async function sendMsg() {
+  const inp = document.getElementById('msgInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  await fetch('/api/send_message', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: text }),
+  });
+  inp.value = '';
+}
+
+// ── Endpoints ──
+const ENDPOINTS = [
+  ['GET','POST','/dcap','Device Capability'],
+  ['GET',null,'/tm','Time'],
+  ['GET',null,'/sdev','Self Device'],
+  ['GET',null,'/sdev/di','Device Info'],
+  ['GET',null,'/sdev/dstat','Device Status'],
+  ['GET',null,'/sdev/ps','Power Status'],
+  ['GET','POST','/edev','End Device List'],
+  ['GET','PUT','DELETE','/edev/<eid>','End Device'],
+  ['GET','PUT','/edev/<eid>/reg','Registration'],
+  ['GET',null,'/edev/<eid>/fsa','Function Set Assignments'],
+  ['GET','POST','/edev/<eid>/der','DER List'],
+  ['GET','PUT','/edev/<eid>/der/<did>/derc','DER Capability'],
+  ['GET','PUT','/edev/<eid>/der/<did>/ders','DER Settings'],
+  ['GET','PUT','/edev/<eid>/der/<did>/dera','DER Availability'],
+  ['GET','PUT','/edev/<eid>/der/<did>/derstatus','DER Status'],
+  ['GET','POST','/derp','DER Program List'],
+  ['GET','DELETE','/derp/<pid>','DER Program'],
+  ['GET','PUT','/derp/<pid>/dderc','Default DER Control'],
+  ['GET','POST','/derp/<pid>/derc','DER Control List'],
+  ['GET',null,'/dr','DR Program List'],
+  ['GET',null,'/dr/<pid>','DR Program'],
+  ['GET','POST','/dr/<pid>/edc','End Device Controls'],
+  ['GET','POST','/mup','Mirror Usage Point List'],
+  ['GET','DELETE','/mup/<mid>','Mirror Usage Point'],
+  ['GET','POST','/mup/<mid>/mr','Mirror Meter Readings'],
+  ['GET',null,'/mup/<mid>/mr/<rid>','Meter Reading'],
+  ['GET',null,'/upt','Usage Point List'],
+  ['GET',null,'/lel','Log Event List'],
+  ['GET','POST','/sub','Subscription List'],
+  ['GET','DELETE','/sub/<sid>','Subscription'],
+  ['GET',null,'/pricep','Pricing Programs'],
+  ['GET','POST','/msg','Messaging'],
+  ['GET',null,'/rsps','Response Sets'],
+  ['POST',null,'/rsps/<rsid>/rsp','Response'],
+  ['GET',null,'/frp','Flow Reservation List'],
+];
+
+function buildEndpointList() {
+  const container = document.getElementById('endpointList');
+  const methodColor = { 'GET': 'ep-get', 'POST': 'ep-post', 'PUT': 'ep-put', 'DELETE': 'ep-del' };
+  container.innerHTML = ENDPOINTS.map(row => {
+    const methods = row.slice(0, -2).filter(Boolean);
+    const path = row[row.length - 2];
+    const desc = row[row.length - 1];
+    return `<div class="endpoint-item">
+      ${methods.map(m => `<span class="ep-method ${methodColor[m] || 'ep-get'}">${m}</span>`).join('')}
+      <span class="ep-path">${path}</span>
+      <span class="ep-desc">${desc}</span>
+    </div>`;
+  }).join('');
+}
+
+buildEndpointList();
+
+// ── Start polling ──
+poll();
+pollDevices();
+pollLogs();
+setInterval(poll, 3000);
+setInterval(pollDevices, 5000);
+setInterval(pollLogs, 5000);
+
+document.getElementById('msgInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMsg();
+});
+</script>
+</body>
+</html>
